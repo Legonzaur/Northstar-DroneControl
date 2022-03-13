@@ -1,0 +1,25 @@
+Selector Common
+
+Selector_End
+
+
+Selector Idle
+
+	SelectSchedule_Alert
+Selector_End
+
+Selector Alert
+
+	SelectSchedule_Alert
+Selector_End
+
+
+Selector Combat
+
+	SelectSchedule_Alert
+Selector_End
+
+Selector CombatEvasive
+
+	SelectSchedule_Alert
+Selector_End

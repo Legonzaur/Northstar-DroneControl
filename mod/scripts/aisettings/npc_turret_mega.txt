@@ -1,0 +1,12 @@
+npc_turret_mega
+{
+	DefaultModelName		"models/robots/drone_air_attack/drone_air_attack_rockets.mdl"
+	HullType				"HULL_SMALL"
+	BodyType				flyingdrone
+
+	Health					90 [$mp]
+	Health					100 [$mp]
+	title 					#NPC_DRONE
+	ui_targetinfo			"ui/targetinfo_npc_basic" [$mp]
+	ui_targetinfo			"" [$sp]
+}

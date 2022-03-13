@@ -1,0 +1,16 @@
+{
+  "Name": "Legonzaur.test",
+  "Description": "e",
+  "LoadPriority": 2,
+  "RequiredOnClient": false,
+  "Version": "1.0.0",
+  "Scripts": [
+    {
+      "Path": "test.gnut",
+      "RunOn": "SERVER && MP",
+      "ServerCallback": {
+        "After": "Test_Init"
+      }
+    }
+  ]
+}

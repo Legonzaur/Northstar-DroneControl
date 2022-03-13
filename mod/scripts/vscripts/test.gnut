@@ -1,0 +1,240 @@
+global function Test_Init
+global function IsDrone
+
+void function Test_Init() {
+    PrecacheParticleSystem( FX_DRONE_EXPLOSION )
+    #if SERVER
+        AddClientCommandCallback( "SpawnDrone", ClientCommand_SpawnCloak )
+        AddCallback_OnPlayerKilled(PlayerKilled)
+        // AddCallback_OnPlayerDisconnected(PlayerDisconnected)
+    #endif
+    //AddDeathCallback( "npc_turret_mega", FakeDroneDeath )
+}
+struct{
+    table<entity, string> playerStatus = {}
+    table<entity, asset> playerModel = {}
+    table<entity, entity> playerProxy = {}
+    table<entity, entity> playerDrone = {}
+} file
+
+
+#if SERVER
+bool function ClientCommand_SpawnCloak( entity player, array<string> args){
+    PlayerStartControlDrone(player)
+    return true
+}
+
+void function PlayerDisconnected(entity player){
+    if(player in file.playerStatus)
+        delete file.playerStatus[player]
+    if(player in file.playerProxy)
+        delete file.playerProxy[player]
+    if(player in file.playerModel)
+        delete file.playerModel[player]
+}
+
+void function PlayerKilled( entity player, entity attacker, var damageInfo ){
+    print("player Killed !!!")
+    if(player in file.playerStatus)
+        delete file.playerStatus[player]
+    if(player in file.playerProxy)
+        delete file.playerProxy[player]
+}
+
+bool function IsDrone(entity player){
+    if(player in file.playerStatus && file.playerStatus[player] == "Controls_Drone")
+        return true
+    return false
+}
+
+void function PlayerStartControlDrone(entity player){
+    if(player in file.playerProxy)
+        return
+
+    file.playerStatus[player] <- "Controls_Drone"
+    StorePilotWeapons( player )
+
+    file.playerProxy[player] <- SpawnFakePlayer(player)
+
+    player.SetCloakDuration( 0, 0, 0 )
+    player.kv.solid = 0
+    file.playerModel[player] <- player.GetModelName()
+    asset model = $"models/robots/drone_air_attack/drone_air_attack_rockets.mdl"
+    player.SetModel(model)
+    player.SetInvulnerable()
+    // player.MakeInvisible()
+    entity drone = SpawnDrone(player)
+    drone.kv.VisibilityFlags = ENTITY_VISIBLE_TO_NOBODY
+    player.SetPhysics(MOVETYPE_FLY)
+    StatusEffect_AddEndless( player, eStatusEffect.speed_boost, 0.8 )
+
+    thread MonitorDroneIsAlive(drone, player)
+}
+
+void function MonitorDroneIsAlive(entity drone, entity player){
+    drone.EndSignal( "OnDeath" )
+    OnThreadEnd(
+    function() : ( player, drone )
+        {
+            print("droneJustDied")
+            FakeDroneDeath(drone)
+            if( IsValid( player ) )
+            {
+                PlayerStopControlDrone(player)
+            }
+
+        }
+    )
+    WaitForever()
+}
+void function PlayerStopControlDrone(entity player){
+    player.kv.solid = 10
+    player.ClearInvulnerable()
+    if(player in file.playerProxy){
+        entity fakePlayer = file.playerProxy[player]
+        vector origin = fakePlayer.GetOrigin();
+        vector angles = fakePlayer.GetAngles()
+        vector velocity = fakePlayer.GetVelocity();
+
+        player.SetOrigin(origin)
+        player.SetAngles(angles)
+        player.SetVelocity(velocity)
+        delete file.playerProxy[player]
+        fakePlayer.Destroy()
+    }
+    StatusEffect_Stop(player, eStatusEffect.speed_boost)
+
+    if(player in file.playerModel){
+        player.SetModel(file.playerModel[player])
+    }
+    if(player in file.playerStatus){
+        delete file.playerStatus[player]
+    }
+}
+
+entity function SpawnFakePlayer(entity player){
+    asset model = player.GetModelName();
+    print(model)
+    int team = player.GetTeam()
+    vector origin = player.GetOrigin();
+    vector angles = player.GetAngles()
+    vector velocity = player.GetVelocity();
+	angles.y = player.EyeAngles().y
+
+    entity fakePlayer = CreatePropDynamic(model)
+    fakePlayer.SetModel(model)
+    fakePlayer.SetValueForModelKey(model)
+    fakePlayer.SetSkin(player.GetSkin())
+    fakePlayer.SetCamo( player.GetCamo() )
+    fakePlayer.SetOrigin(origin)
+    fakePlayer.SetAngles(angles)
+    fakePlayer.SetVelocity(velocity)
+    fakePlayer.SetTitle( "" )
+    fakePlayer.SetMaxHealth(100)
+    fakePlayer.SetHealth(100)
+    fakePlayer.Anim_Play( "CQB_Idle_MP")
+    fakePlayer.SetBossPlayer(player)
+    fakePlayer.kv.HullType = 0
+    fakePlayer.kv.solid = 10
+    fakePlayer.Solid()
+	fakePlayer.Show()
+    SetTeam( fakePlayer, team )
+
+
+
+    // entity fakePlayer = CreateEntity("npc_pilot_elite")
+    // fakePlayer.SetModel(model)
+    // fakePlayer.SetValueForModelKey(model)
+    // fakePlayer.SetSkin(player.GetSkin())
+    // fakePlayer.SetCamo( player.GetCamo() )
+
+    // fakePlayer.SetOrigin(origin)
+    // fakePlayer.SetAngles(angles)
+    // DispatchSpawn(fakePlayer)
+    // SetTeam( fakePlayer, team )
+    // fakePlayer.SetOrigin(origin)
+    // fakePlayer.SetAngles(angles)
+    // fakePlayer.SetVelocity(velocity)
+
+    // fakePlayer.SetMaxHealth(100)
+    // fakePlayer.SetHealth(100)
+    // fakePlayer.SetTakeDamageType( DAMAGE_YES )
+    // fakePlayer.SetDamageNotifications( true )
+
+    // fakePlayer.SetTitle( "" )
+
+    // fakePlayer.SetSkin( player.GetSkin() )
+	// fakePlayer.SetCamo( player.GetCamo() )
+    // fakePlayer.SetBossPlayer(player)
+    // fakePlayer.Solid()
+
+    // entity activeWeapon = player.GetActiveWeapon()
+	// asset weaponModel = activeWeapon == null ? $"" : activeWeapon.GetModelName()
+    // if(player.GetActiveWeapon()){
+    //     fakePlayer.TakeWeaponNow(player.GetMainWeapons()[0].GetWeaponClassName())
+    //     fakePlayer.GiveWeapon(player.GetActiveWeapon().GetWeaponClassName())
+    // }
+    // SetTeam(fakePlayer, player.GetTeam())
+    // fakePlayer.SetModel(model)
+    // fakePlayer.SetValueForModelKey(model)
+    // NpcCloakOn(fakePlayer)
+	return fakePlayer
+}
+
+entity function SpawnDrone(entity player){
+    // drone.kv.HullType = 3
+    int team = player.GetTeam()
+    vector origin = player.GetOrigin()
+    vector angles = player.GetAngles()
+    entity drone = CreateEntity("npc_turret_mega")
+    //entity drone = CreateEntity("npc_drone")
+    //entity drone = CreateGenericDrone(team, origin, angles)
+    drone.SetOrigin(origin)
+    drone.SetAngles(angles)
+    drone.SetParent(player)
+    DispatchSpawn( drone )
+	SetTeam( drone, team )
+    drone.SetTitle( "" )
+	drone.SetMaxHealth( 250 )
+	drone.SetHealth( 250 )
+	drone.SetTakeDamageType( DAMAGE_YES )
+	drone.SetDamageNotifications( true )
+	drone.SetDeathNotifications( true )
+	drone.Solid()
+	drone.Show()
+    return drone
+}
+
+
+
+void function FakeDroneDeath(entity drone){
+    //Play Particles
+    entity explosion = CreateEntity( "info_particle_system" )
+    explosion.SetOrigin( drone.GetWorldSpaceCenter() )
+	explosion.SetAngles( drone.GetAngles() )
+	explosion.SetValueForEffectNameKey( $"P_drone_exp_md" )
+	explosion.kv.start_active = 1
+	DispatchSpawn( explosion )
+
+    EmitSoundAtPosition( TEAM_UNASSIGNED, drone.GetOrigin(), "Drone_DeathExplo" )
+    drone.Destroy()
+}
+
+void function entityprint(entity ent){
+    var rawKey = ent.GetNextKey(null)
+    if(rawKey == null)
+    return
+    string key = expect string(rawKey)
+    print(key)
+    while(true)
+    {
+    //do stuff here
+    rawKey = ent.GetNextKey(key)
+    if(rawKey == null)
+        break
+    key = expect string(rawKey)
+    print(key)
+    }
+}
+
+#endif
